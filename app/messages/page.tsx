@@ -1,0 +1,314 @@
+"use client"
+
+import { useState } from "react"
+import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Search, Send, ImageIcon, Paperclip, Smile, MoreVertical, Phone, Video, Info } from "lucide-react"
+
+const conversations = [
+  {
+    id: 1,
+    name: "Sophia Chen",
+    avatar: "/placeholder.svg?height=40&width=40",
+    lastMessage: "Can you help me with the math problem?",
+    time: "2m ago",
+    unread: 2,
+    online: true,
+  },
+  {
+    id: 2,
+    name: "Marcus Williams",
+    avatar: "/placeholder.svg?height=40&width=40",
+    lastMessage: "Thanks for sharing the notes!",
+    time: "1h ago",
+    unread: 0,
+    online: false,
+  },
+  {
+    id: 3,
+    name: "Priya Patel",
+    avatar: "/placeholder.svg?height=40&width=40",
+    lastMessage: "Are you joining the study group?",
+    time: "3h ago",
+    unread: 1,
+    online: true,
+  },
+  {
+    id: 4,
+    name: "Study Group",
+    avatar: "/placeholder.svg?height=40&width=40",
+    lastMessage: "Alex: I'll share my notes later",
+    time: "5h ago",
+    unread: 0,
+    online: false,
+    isGroup: true,
+  },
+]
+
+const messages = [
+  {
+    id: 1,
+    sender: "Sophia Chen",
+    content: "Hey! I'm struggling with this calculus problem. Could you help me?",
+    time: "10:30 AM",
+    isMe: false,
+  },
+  {
+    id: 2,
+    sender: "Me",
+    content: "What's the problem?",
+    time: "10:32 AM",
+    isMe: true,
+  },
+  {
+    id: 3,
+    sender: "Sophia Chen",
+    content: "It's about integration by parts. I'm not sure how to apply it to this equation.",
+    time: "10:33 AM",
+    isMe: false,
+  },
+  {
+    id: 4,
+    sender: "Sophia Chen",
+    content: "Here's the problem:",
+    time: "10:33 AM",
+    isMe: false,
+  },
+  {
+    id: 5,
+    sender: "Sophia Chen",
+    content: "∫ x ln(x) dx",
+    time: "10:34 AM",
+    isMe: false,
+  },
+  {
+    id: 6,
+    sender: "Me",
+    content: "Ah, that's a classic integration by parts problem! Remember the formula: ∫u dv = uv - ∫v du",
+    time: "10:36 AM",
+    isMe: true,
+  },
+  {
+    id: 7,
+    sender: "Me",
+    content: "Let u = ln(x) and dv = x dx. Then du = (1/x) dx and v = x²/2",
+    time: "10:37 AM",
+    isMe: true,
+  },
+  {
+    id: 8,
+    sender: "Sophia Chen",
+    content: "Oh, I see! So I'll get ∫ x ln(x) dx = (x²/2)ln(x) - ∫ (x²/2)(1/x) dx",
+    time: "10:39 AM",
+    isMe: false,
+  },
+  {
+    id: 9,
+    sender: "Sophia Chen",
+    content: "Which simplifies to (x²/2)ln(x) - ∫ (x/2) dx = (x²/2)ln(x) - (x²/4) + C",
+    time: "10:40 AM",
+    isMe: false,
+  },
+  {
+    id: 10,
+    sender: "Me",
+    content: "Exactly! You've got it. The final answer is (x²/2)ln(x) - (x²/4) + C",
+    time: "10:41 AM",
+    isMe: true,
+  },
+  {
+    id: 11,
+    sender: "Sophia Chen",
+    content: "Thank you so much! That was really helpful.",
+    time: "10:42 AM",
+    isMe: false,
+  },
+  {
+    id: 12,
+    sender: "Me",
+    content: "No problem! Let me know if you have any other questions.",
+    time: "10:43 AM",
+    isMe: true,
+  },
+  {
+    id: 13,
+    sender: "Sophia Chen",
+    content: "Actually, I have one more question about another calculus problem...",
+    time: "10:45 AM",
+    isMe: false,
+  },
+]
+
+export default function MessagesPage() {
+  const [activeConversation, setActiveConversation] = useState(conversations[0])
+  const [newMessage, setNewMessage] = useState("")
+
+  const handleSendMessage = () => {
+    if (!newMessage.trim()) return
+    // In a real app, you would send the message to the server
+    setNewMessage("")
+  }
+
+  return (
+    <div className="container mx-auto h-[calc(100vh-4rem)] px-4 py-6">
+      <div className="grid h-full grid-cols-1 gap-4 md:grid-cols-12">
+        {/* Conversations List */}
+        <div className="md:col-span-4 lg:col-span-3">
+          <div className="flex h-full flex-col rounded-lg border">
+            <div className="border-b p-4">
+              <h2 className="mb-4 text-xl font-bold">Messages</h2>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input type="search" placeholder="Search conversations..." className="pl-8" />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2">
+              {conversations.map((conversation) => (
+                <div
+                  key={conversation.id}
+                  className={`mb-2 flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors hover:bg-muted ${
+                    activeConversation.id === conversation.id ? "bg-muted" : ""
+                  }`}
+                  onClick={() => setActiveConversation(conversation)}
+                >
+                  <div className="relative">
+                    <Avatar>
+                      <AvatarImage src={conversation.avatar} />
+                      <AvatarFallback>{conversation.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    {conversation.online && (
+                      <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background bg-green-500"></span>
+                    )}
+                  </div>
+
+                  <div className="flex-1 overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">
+                        {conversation.name}
+                        {conversation.isGroup && (
+                          <Badge variant="outline" className="ml-2 bg-primary/10">
+                            Group
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground">{conversation.time}</span>
+                    </div>
+                    <div className="truncate text-sm text-muted-foreground">{conversation.lastMessage}</div>
+                  </div>
+
+                  {conversation.unread > 0 && (
+                    <Badge className="ml-auto flex h-5 w-5 items-center justify-center rounded-full p-0">
+                      {conversation.unread}
+                    </Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Chat Area */}
+        <div className="md:col-span-8 lg:col-span-9">
+          <Card className="flex h-full flex-col">
+            {/* Chat Header */}
+            <div className="flex items-center justify-between border-b p-4">
+              <div className="flex items-center gap-3">
+                <Avatar>
+                  <AvatarImage src={activeConversation.avatar} />
+                  <AvatarFallback>{activeConversation.name.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="font-medium">{activeConversation.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {activeConversation.online ? (
+                      <span className="flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                        Online
+                      </span>
+                    ) : (
+                      "Offline"
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon">
+                  <Phone className="h-5 w-5" />
+                </Button>
+                <Button variant="ghost" size="icon">
+                  <Video className="h-5 w-5" />
+                </Button>
+                <Button variant="ghost" size="icon">
+                  <Info className="h-5 w-5" />
+                </Button>
+                <Button variant="ghost" size="icon">
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <div key={message.id} className={`flex ${message.isMe ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-[80%] rounded-lg p-3 ${
+                        message.isMe ? "bg-primary text-primary-foreground" : "bg-muted"
+                      }`}
+                    >
+                      {!message.isMe && <div className="mb-1 text-xs font-medium">{message.sender}</div>}
+                      <div>{message.content}</div>
+                      <div
+                        className={`mt-1 text-right text-xs ${
+                          message.isMe ? "text-primary-foreground/70" : "text-muted-foreground"
+                        }`}
+                      >
+                        {message.time}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Message Input */}
+            <div className="border-t p-4">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon">
+                  <Paperclip className="h-5 w-5" />
+                </Button>
+                <Button variant="ghost" size="icon">
+                  <ImageIcon className="h-5 w-5" />
+                </Button>
+                <Input
+                  placeholder="Type a message..."
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleSendMessage()
+                    }
+                  }}
+                  className="flex-1"
+                />
+                <Button variant="ghost" size="icon">
+                  <Smile className="h-5 w-5" />
+                </Button>
+                <Button size="icon" onClick={handleSendMessage}>
+                  <Send className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}
+
