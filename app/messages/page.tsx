@@ -1,16 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Search, Send, ImageIcon, Paperclip, Smile, MoreVertical, Phone, Video, Info } from "lucide-react"
+import { useChatStore, wsService } from "@/lib/websocket"
+import { useToast } from "@/components/ui/use-toast"
+import { formatDistanceToNow } from "date-fns"
 
+// Mock conversations data - in a real app, this would come from an API
 const conversations = [
   {
-    id: 1,
+    id: "1",
     name: "Sophia Chen",
     avatar: "/placeholder.svg?height=40&width=40",
     lastMessage: "Can you help me with the math problem?",
@@ -19,7 +23,7 @@ const conversations = [
     online: true,
   },
   {
-    id: 2,
+    id: "2",
     name: "Marcus Williams",
     avatar: "/placeholder.svg?height=40&width=40",
     lastMessage: "Thanks for sharing the notes!",
@@ -28,7 +32,7 @@ const conversations = [
     online: false,
   },
   {
-    id: 3,
+    id: "3",
     name: "Priya Patel",
     avatar: "/placeholder.svg?height=40&width=40",
     lastMessage: "Are you joining the study group?",
@@ -37,7 +41,7 @@ const conversations = [
     online: true,
   },
   {
-    id: 4,
+    id: "4",
     name: "Study Group",
     avatar: "/placeholder.svg?height=40&width=40",
     lastMessage: "Alex: I'll share my notes later",
@@ -48,109 +52,59 @@ const conversations = [
   },
 ]
 
-const messages = [
-  {
-    id: 1,
-    sender: "Sophia Chen",
-    content: "Hey! I'm struggling with this calculus problem. Could you help me?",
-    time: "10:30 AM",
-    isMe: false,
-  },
-  {
-    id: 2,
-    sender: "Me",
-    content: "What's the problem?",
-    time: "10:32 AM",
-    isMe: true,
-  },
-  {
-    id: 3,
-    sender: "Sophia Chen",
-    content: "It's about integration by parts. I'm not sure how to apply it to this equation.",
-    time: "10:33 AM",
-    isMe: false,
-  },
-  {
-    id: 4,
-    sender: "Sophia Chen",
-    content: "Here's the problem:",
-    time: "10:33 AM",
-    isMe: false,
-  },
-  {
-    id: 5,
-    sender: "Sophia Chen",
-    content: "∫ x ln(x) dx",
-    time: "10:34 AM",
-    isMe: false,
-  },
-  {
-    id: 6,
-    sender: "Me",
-    content: "Ah, that's a classic integration by parts problem! Remember the formula: ∫u dv = uv - ∫v du",
-    time: "10:36 AM",
-    isMe: true,
-  },
-  {
-    id: 7,
-    sender: "Me",
-    content: "Let u = ln(x) and dv = x dx. Then du = (1/x) dx and v = x²/2",
-    time: "10:37 AM",
-    isMe: true,
-  },
-  {
-    id: 8,
-    sender: "Sophia Chen",
-    content: "Oh, I see! So I'll get ∫ x ln(x) dx = (x²/2)ln(x) - ∫ (x²/2)(1/x) dx",
-    time: "10:39 AM",
-    isMe: false,
-  },
-  {
-    id: 9,
-    sender: "Sophia Chen",
-    content: "Which simplifies to (x²/2)ln(x) - ∫ (x/2) dx = (x²/2)ln(x) - (x²/4) + C",
-    time: "10:40 AM",
-    isMe: false,
-  },
-  {
-    id: 10,
-    sender: "Me",
-    content: "Exactly! You've got it. The final answer is (x²/2)ln(x) - (x²/4) + C",
-    time: "10:41 AM",
-    isMe: true,
-  },
-  {
-    id: 11,
-    sender: "Sophia Chen",
-    content: "Thank you so much! That was really helpful.",
-    time: "10:42 AM",
-    isMe: false,
-  },
-  {
-    id: 12,
-    sender: "Me",
-    content: "No problem! Let me know if you have any other questions.",
-    time: "10:43 AM",
-    isMe: true,
-  },
-  {
-    id: 13,
-    sender: "Sophia Chen",
-    content: "Actually, I have one more question about another calculus problem...",
-    time: "10:45 AM",
-    isMe: false,
-  },
-]
-
 export default function MessagesPage() {
+  const { toast } = useToast()
+  const messagesEndRef = useRef<HTMLDivElement>(null)
   const [activeConversation, setActiveConversation] = useState(conversations[0])
   const [newMessage, setNewMessage] = useState("")
+  const { messages, addMessage, setActiveConversation: setStoreActiveConversation, markMessageAsRead } = useChatStore()
+
+  // Mock current user ID - in a real app, this would come from auth
+  const currentUserId = "current-user"
+
+  useEffect(() => {
+    // Connect to WebSocket when component mounts
+    wsService.connect(currentUserId)
+
+    // Cleanup on unmount
+    return () => {
+      wsService.disconnect()
+    }
+  }, [currentUserId])
+
+  useEffect(() => {
+    // Scroll to bottom when new messages arrive
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
 
   const handleSendMessage = () => {
     if (!newMessage.trim()) return
-    // In a real app, you would send the message to the server
+
+    const message = {
+      senderId: currentUserId,
+      receiverId: activeConversation.id,
+      content: newMessage.trim(),
+      isRead: false,
+    }
+
+    wsService.sendMessage(message)
     setNewMessage("")
   }
+
+  const handleConversationSelect = (conversation: typeof conversations[0]) => {
+    setActiveConversation(conversation)
+    setStoreActiveConversation(conversation.id)
+    // Mark messages as read when selecting a conversation
+    messages
+      .filter((msg) => !msg.isRead && msg.receiverId === currentUserId && msg.senderId === conversation.id)
+      .forEach((msg) => markMessageAsRead(msg.id))
+  }
+
+  const conversationMessages = messages.filter(
+    (msg) =>
+      (msg.senderId === currentUserId && msg.receiverId === activeConversation.id) ||
+      (msg.senderId === activeConversation.id && msg.receiverId === currentUserId)
+  )
 
   return (
     <div className="container mx-auto h-[calc(100vh-4rem)] px-4 py-6">
@@ -173,7 +127,7 @@ export default function MessagesPage() {
                   className={`mb-2 flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors hover:bg-muted ${
                     activeConversation.id === conversation.id ? "bg-muted" : ""
                   }`}
-                  onClick={() => setActiveConversation(conversation)}
+                  onClick={() => handleConversationSelect(conversation)}
                 >
                   <div className="relative">
                     <Avatar>
@@ -255,25 +209,35 @@ export default function MessagesPage() {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-4">
-                {messages.map((message) => (
-                  <div key={message.id} className={`flex ${message.isMe ? "justify-end" : "justify-start"}`}>
+                {conversationMessages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.senderId === currentUserId ? "justify-end" : "justify-start"}`}
+                  >
                     <div
                       className={`max-w-[80%] rounded-lg p-3 ${
-                        message.isMe ? "bg-primary text-primary-foreground" : "bg-muted"
+                        message.senderId === currentUserId
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted"
                       }`}
                     >
-                      {!message.isMe && <div className="mb-1 text-xs font-medium">{message.sender}</div>}
+                      {message.senderId !== currentUserId && (
+                        <div className="mb-1 text-xs font-medium">{activeConversation.name}</div>
+                      )}
                       <div>{message.content}</div>
                       <div
                         className={`mt-1 text-right text-xs ${
-                          message.isMe ? "text-primary-foreground/70" : "text-muted-foreground"
+                          message.senderId === currentUserId
+                            ? "text-primary-foreground/70"
+                            : "text-muted-foreground"
                         }`}
                       >
-                        {message.time}
+                        {formatDistanceToNow(message.timestamp, { addSuffix: true })}
                       </div>
                     </div>
                   </div>
                 ))}
+                <div ref={messagesEndRef} />
               </div>
             </div>
 

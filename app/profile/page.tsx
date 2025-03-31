@@ -1,10 +1,67 @@
+"use client"
+
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Settings, Award, BookOpen, Users, Bookmark, Share2 } from "lucide-react"
+import { Edit, Settings, Award, BookOpen, Users, Bookmark, Share2, X } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function ProfilePage() {
+  const { toast } = useToast()
+  const [isEditing, setIsEditing] = useState(false)
+  const [profileData, setProfileData] = useState({
+    name: "Alex Johnson",
+    username: "@alexj",
+    bio: "Math enthusiast and science lover. Always learning!",
+    interests: ["Math", "Science", "Coding"],
+    avatar: "/placeholder.svg?height=128&width=128",
+  })
+
+  const handleSaveProfile = () => {
+    // In a real app, this would save to a backend
+    toast({
+      title: "Profile updated",
+      description: "Your profile has been successfully updated.",
+    })
+    setIsEditing(false)
+  }
+
+  const handleAddInterest = (interest: string) => {
+    if (!profileData.interests.includes(interest)) {
+      setProfileData({
+        ...profileData,
+        interests: [...profileData.interests, interest],
+      })
+    }
+  }
+
+  const handleRemoveInterest = (interest: string) => {
+    setProfileData({
+      ...profileData,
+      interests: profileData.interests.filter((i) => i !== interest),
+    })
+  }
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setProfileData({
+          ...profileData,
+          avatar: reader.result as string,
+        })
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
   return (
     <div className="container mx-auto px-4 py-6">
       {/* Profile Header */}
@@ -18,25 +75,21 @@ export default function ProfilePage() {
         <div className="relative -mt-16 flex flex-col items-center px-4 sm:flex-row sm:items-end sm:px-6">
           <div className="z-10 h-32 w-32 overflow-hidden rounded-full border-4 border-background bg-background">
             <img
-              src="/placeholder.svg?height=128&width=128"
+              src={profileData.avatar}
               alt="Profile picture"
               className="h-full w-full object-cover"
             />
           </div>
 
           <div className="mt-4 flex flex-1 flex-col items-center text-center sm:ml-4 sm:items-start sm:text-left">
-            <h1 className="text-2xl font-bold">Alex Johnson</h1>
-            <p className="text-muted-foreground">@alexj</p>
+            <h1 className="text-2xl font-bold">{profileData.name}</h1>
+            <p className="text-muted-foreground">{profileData.username}</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Badge variant="outline" className="bg-primary/10">
-                Math Enthusiast
-              </Badge>
-              <Badge variant="outline" className="bg-primary/10">
-                Science Lover
-              </Badge>
-              <Badge variant="outline" className="bg-primary/10">
-                Coding Beginner
-              </Badge>
+              {profileData.interests.map((interest) => (
+                <Badge key={interest} variant="outline" className="bg-primary/10">
+                  {interest}
+                </Badge>
+              ))}
             </div>
           </div>
 
@@ -45,9 +98,9 @@ export default function ProfilePage() {
               <Share2 className="mr-2 h-4 w-4" />
               Share
             </Button>
-            <Button size="sm">
+            <Button size="sm" onClick={() => setIsEditing(!isEditing)}>
               <Edit className="mr-2 h-4 w-4" />
-              Edit Profile
+              {isEditing ? "Cancel" : "Edit Profile"}
             </Button>
           </div>
         </div>
@@ -208,42 +261,89 @@ export default function ProfilePage() {
               <h3 className="mb-4 text-lg font-medium">Profile Settings</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Display Name</label>
-                  <input
-                    type="text"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2"
-                    defaultValue="Alex Johnson"
+                  <Label htmlFor="name">Display Name</Label>
+                  <Input
+                    id="name"
+                    value={profileData.name}
+                    onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                    disabled={!isEditing}
                   />
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Bio</label>
-                  <textarea
-                    className="w-full rounded-md border border-input bg-background px-3 py-2"
+                  <Label htmlFor="bio">Bio</Label>
+                  <Textarea
+                    id="bio"
+                    value={profileData.bio}
+                    onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+                    disabled={!isEditing}
                     rows={3}
-                    defaultValue="Math enthusiast and science lover. Always learning!"
                   />
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Interests</label>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline" className="bg-primary/10">
-                      Math
-                    </Badge>
-                    <Badge variant="outline" className="bg-primary/10">
-                      Science
-                    </Badge>
-                    <Badge variant="outline" className="bg-primary/10">
-                      Coding
-                    </Badge>
-                    <Button variant="outline" size="sm" className="h-6">
-                      + Add
-                    </Button>
+                  <Label>Profile Picture</Label>
+                  <div className="mt-1 flex items-center gap-4">
+                    <Avatar className="h-16 w-16">
+                      <AvatarImage src={profileData.avatar} />
+                      <AvatarFallback>AJ</AvatarFallback>
+                    </Avatar>
+                    {isEditing && (
+                      <div>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleAvatarChange}
+                          className="hidden"
+                          id="avatar-upload"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById("avatar-upload")?.click()}
+                        >
+                          Change Picture
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline">Cancel</Button>
-                  <Button>Save Changes</Button>
+                <div>
+                  <Label>Interests</Label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {profileData.interests.map((interest) => (
+                      <Badge key={interest} variant="outline" className="bg-primary/10">
+                        {interest}
+                        {isEditing && (
+                          <button
+                            onClick={() => handleRemoveInterest(interest)}
+                            className="ml-1 rounded-full hover:bg-muted"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </Badge>
+                    ))}
+                    {isEditing && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6"
+                        onClick={() => {
+                          const newInterest = prompt("Enter a new interest:")
+                          if (newInterest) handleAddInterest(newInterest)
+                        }}
+                      >
+                        + Add
+                      </Button>
+                    )}
+                  </div>
                 </div>
+                {isEditing && (
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setIsEditing(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveProfile}>Save Changes</Button>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
