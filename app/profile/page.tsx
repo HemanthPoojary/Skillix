@@ -173,14 +173,45 @@ export default function ProfilePage() {
         </TabsList>
 
         <TabsContent value="posts">
-          <div className="grid gap-4">
-            {/* Posts content */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Card key={i} className="overflow-hidden">
+                <div className="aspect-video w-full bg-muted">
+                  <img
+                    src={`/placeholder.svg?height=200&width=300`}
+                    alt={`Post ${i}`}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <CardContent className="p-4">
+                  <h3 className="mb-2 font-semibold">
+                    {
+                      [
+                        "How to Solve Quadratic Equations",
+                        "Chemistry Lab Results",
+                        "My Coding Journey",
+                        "History Quiz Challenge",
+                        "Book Review",
+                        "Science Project",
+                      ][i - 1]
+                    }
+                  </h3>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{Math.floor(Math.random() * 1000) + 100} views</span>
+                    <span>{Math.floor(Math.random() * 30) + 1} days ago</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </TabsContent>
 
         <TabsContent value="saved">
-          <div className="grid gap-4">
-            {/* Saved content */}
+          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
+            <Bookmark className="mb-2 h-10 w-10 text-muted-foreground" />
+            <h3 className="mb-1 text-lg font-medium">No saved content yet</h3>
+            <p className="mb-4 text-muted-foreground">Items you save will appear here</p>
+            <Button>Browse Content</Button>
           </div>
         </TabsContent>
 
