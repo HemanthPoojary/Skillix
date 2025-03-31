@@ -1,2 +1,2 @@
-# Build-w-AI-Project
+# Skillix-project
 This repository is to store all my AI projects.
