@@ -1,202 +1,169 @@
 "use client"
 
+import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { BookOpen, Users, Hash } from "lucide-react"
+import { Search, Users, BookOpen, Briefcase, Building2, GraduationCap } from "lucide-react"
 
-export default function SearchPage() {
+type SearchResult = {
+  id: number
+  type: "user" | "course" | "company"
+  name?: string
+  username?: string
+  avatar?: string
+  bio?: string
+  skills?: string[]
+  title?: string
+  instructor?: string
+  rating?: number
+  students?: number
+  price?: string
+  thumbnail?: string
+  logo?: string
+  description?: string
+  location?: string
+  size?: string
+}
+
+function SearchContent() {
   const searchParams = useSearchParams()
   const query = searchParams.get("q") || ""
 
-  // Mock search results - in a real app, these would come from an API
-  const results = {
-    posts: [
-      {
-        id: 1,
-        title: "How to Solve Quadratic Equations",
-        author: "Alex Johnson",
-        views: 1200,
-        date: "2 days ago",
-        tags: ["Math", "Algebra"],
-      },
-      {
-        id: 2,
-        title: "Chemistry Lab Results",
-        author: "Sophia Chen",
-        views: 850,
-        date: "1 week ago",
-        tags: ["Science", "Chemistry"],
-      },
-      {
-        id: 3,
-        title: "My Coding Journey",
-        author: "Marcus Williams",
-        views: 2100,
-        date: "3 days ago",
-        tags: ["Programming", "Web Development"],
-      },
-    ],
-    people: [
-      {
-        id: 1,
-        name: "Alex Johnson",
-        username: "@alexj",
-        bio: "Math enthusiast and science lover",
-        followers: 1200,
-        tags: ["Math", "Science"],
-      },
-      {
-        id: 2,
-        name: "Sophia Chen",
-        username: "@sophiac",
-        bio: "Chemistry student and researcher",
-        followers: 850,
-        tags: ["Science", "Chemistry"],
-      },
-      {
-        id: 3,
-        name: "Marcus Williams",
-        username: "@marcusw",
-        bio: "Full-stack developer and tech enthusiast",
-        followers: 2100,
-        tags: ["Programming", "Web Development"],
-      },
-    ],
-    tags: [
-      {
-        id: 1,
-        name: "Mathematics",
-        posts: 1500,
-        followers: 5000,
-      },
-      {
-        id: 2,
-        name: "Science",
-        posts: 1200,
-        followers: 4500,
-      },
-      {
-        id: 3,
-        name: "Programming",
-        posts: 2000,
-        followers: 8000,
-      },
-    ],
-  }
+  const results: SearchResult[] = [
+    {
+      id: 1,
+      type: "user",
+      name: "Sophia Chen",
+      username: "@sophia",
+      avatar: "/placeholder.svg?height=40&width=40",
+      bio: "Full-stack developer | Open source contributor",
+      skills: ["React", "Node.js", "TypeScript"],
+    },
+    {
+      id: 2,
+      type: "course",
+      title: "Advanced React Patterns",
+      instructor: "Marcus Williams",
+      rating: 4.8,
+      students: 1234,
+      price: "$49.99",
+      thumbnail: "/placeholder.svg?height=200&width=300",
+    },
+    {
+      id: 3,
+      type: "company",
+      name: "TechCorp Inc.",
+      logo: "/placeholder.svg?height=40&width=40",
+      description: "Leading technology solutions provider",
+      location: "San Francisco, CA",
+      size: "100-500 employees",
+    },
+  ]
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Search Results</h1>
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-8">
+        <h1 className="mb-2 text-3xl font-bold">Search Results</h1>
         <p className="text-muted-foreground">
-          Showing results for "{query}"
+          {query ? `Showing results for "${query}"` : "Enter a search term to begin"}
         </p>
       </div>
 
-      <Tabs defaultValue="posts" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="posts" className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4" />
-            Posts
-          </TabsTrigger>
-          <TabsTrigger value="people" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            People
-          </TabsTrigger>
-          <TabsTrigger value="tags" className="flex items-center gap-2">
-            <Hash className="h-4 w-4" />
-            Tags
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="posts" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {results.posts.map((post) => (
-              <Card key={post.id} className="overflow-hidden">
-                <CardContent className="p-4">
-                  <h3 className="mb-2 font-semibold">{post.title}</h3>
-                  <div className="mb-2 flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={`/placeholder.svg?height=24&width=24`} />
-                      <AvatarFallback>{post.author[0]}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm text-muted-foreground">{post.author}</span>
-                  </div>
-                  <div className="mb-2 flex flex-wrap gap-1">
-                    {post.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>{post.views} views</span>
-                    <span>{post.date}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="people" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {results.people.map((person) => (
-              <Card key={person.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={`/placeholder.svg?height=48&width=48`} />
-                      <AvatarFallback>{person.name[0]}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h3 className="font-medium">{person.name}</h3>
-                      <p className="text-sm text-muted-foreground">{person.username}</p>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {results.map((result) => (
+          <Card key={result.id} className="overflow-hidden">
+            {result.type === "user" && result.name && result.skills && (
+              <CardContent className="p-4">
+                <div className="flex items-start gap-4">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={result.avatar} />
+                    <AvatarFallback>{result.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="font-medium">{result.name}</div>
+                    <div className="text-sm text-muted-foreground">{result.username}</div>
+                    <p className="mt-2 text-sm">{result.bio}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {result.skills.map((skill) => (
+                        <Badge key={skill} variant="secondary">
+                          {skill}
+                        </Badge>
+                      ))}
                     </div>
                   </div>
-                  <p className="mt-2 text-sm">{person.bio}</p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {person.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="mt-3 flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">{person.followers} followers</span>
-                    <Button size="sm">Follow</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
+                </div>
+              </CardContent>
+            )}
 
-        <TabsContent value="tags" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {results.tags.map((tag) => (
-              <Card key={tag.id}>
+            {result.type === "course" && result.title && (
+              <>
+                <div className="aspect-video w-full overflow-hidden">
+                  <img
+                    src={result.thumbnail}
+                    alt={result.title}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
                 <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">#{tag.name}</h3>
-                    <Button size="sm" variant="outline">
-                      Follow
-                    </Button>
+                  <div className="font-medium">{result.title}</div>
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    Instructor: {result.instructor}
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
-                    <span>{tag.posts} posts</span>
-                    <span>{tag.followers} followers</span>
+                  <div className="mt-2 flex items-center gap-4">
+                    <div className="flex items-center gap-1">
+                      <span className="text-yellow-500">★</span>
+                      <span className="text-sm">{result.rating}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Users className="h-4 w-4" />
+                      <span>{result.students} students</span>
+                    </div>
                   </div>
+                  <div className="mt-4 font-medium text-primary">{result.price}</div>
                 </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
+              </>
+            )}
+
+            {result.type === "company" && result.name && (
+              <CardContent className="p-4">
+                <div className="flex items-start gap-4">
+                  <div className="h-12 w-12 overflow-hidden rounded-lg">
+                    <img
+                      src={result.logo}
+                      alt={result.name}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">{result.name}</div>
+                    <p className="mt-1 text-sm text-muted-foreground">{result.description}</p>
+                    <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                      <Building2 className="h-4 w-4" />
+                      <span>{result.location}</span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                      <Briefcase className="h-4 w-4" />
+                      <span>{result.size}</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        ))}
+      </div>
     </div>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SearchContent />
+    </Suspense>
   )
 } 
