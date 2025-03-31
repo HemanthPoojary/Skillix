@@ -11,17 +11,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from "@/components/ui/use-toast"
+import { useProfileStore } from "@/lib/store"
 
 export default function ProfilePage() {
   const { toast } = useToast()
   const [isEditing, setIsEditing] = useState(false)
-  const [profileData, setProfileData] = useState({
-    name: "Alex Johnson",
-    username: "@alexj",
-    bio: "Math enthusiast and science lover. Always learning!",
-    interests: ["Math", "Science", "Coding"],
-    avatar: "/placeholder.svg?height=128&width=128",
-  })
+  const { profile, updateProfile } = useProfileStore()
 
   const handleSaveProfile = () => {
     // In a real app, this would save to a backend
@@ -33,18 +28,16 @@ export default function ProfilePage() {
   }
 
   const handleAddInterest = (interest: string) => {
-    if (!profileData.interests.includes(interest)) {
-      setProfileData({
-        ...profileData,
-        interests: [...profileData.interests, interest],
+    if (!profile.interests.includes(interest)) {
+      updateProfile({
+        interests: [...profile.interests, interest],
       })
     }
   }
 
   const handleRemoveInterest = (interest: string) => {
-    setProfileData({
-      ...profileData,
-      interests: profileData.interests.filter((i) => i !== interest),
+    updateProfile({
+      interests: profile.interests.filter((i) => i !== interest),
     })
   }
 
@@ -53,8 +46,7 @@ export default function ProfilePage() {
     if (file) {
       const reader = new FileReader()
       reader.onloadend = () => {
-        setProfileData({
-          ...profileData,
+        updateProfile({
           avatar: reader.result as string,
         })
       }
@@ -75,17 +67,17 @@ export default function ProfilePage() {
         <div className="relative -mt-16 flex flex-col items-center px-4 sm:flex-row sm:items-end sm:px-6">
           <div className="z-10 h-32 w-32 overflow-hidden rounded-full border-4 border-background bg-background">
             <img
-              src={profileData.avatar}
+              src={profile.avatar}
               alt="Profile picture"
               className="h-full w-full object-cover"
             />
           </div>
 
           <div className="mt-4 flex flex-1 flex-col items-center text-center sm:ml-4 sm:items-start sm:text-left">
-            <h1 className="text-2xl font-bold">{profileData.name}</h1>
-            <p className="text-muted-foreground">{profileData.username}</p>
+            <h1 className="text-2xl font-bold">{profile.name}</h1>
+            <p className="text-muted-foreground">{profile.username}</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {profileData.interests.map((interest) => (
+              {profile.interests.map((interest) => (
                 <Badge key={interest} variant="outline" className="bg-primary/10">
                   {interest}
                 </Badge>
@@ -98,9 +90,9 @@ export default function ProfilePage() {
               <Share2 className="mr-2 h-4 w-4" />
               Share
             </Button>
-            <Button size="sm" onClick={() => setIsEditing(!isEditing)}>
+            <Button size="sm" onClick={() => setIsEditing(true)}>
               <Edit className="mr-2 h-4 w-4" />
-              {isEditing ? "Cancel" : "Edit Profile"}
+              Edit Profile
             </Button>
           </div>
         </div>
@@ -160,7 +152,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Content Tabs */}
-      <Tabs defaultValue="posts" className="w-full">
+      <Tabs defaultValue={isEditing ? "settings" : "posts"} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="posts" className="flex items-center gap-2">
             <BookOpen className="h-4 w-4" />
@@ -180,46 +172,15 @@ export default function ProfilePage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="posts" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i} className="overflow-hidden">
-                <div className="aspect-video w-full bg-muted">
-                  <img
-                    src={`/placeholder.svg?height=200&width=300`}
-                    alt={`Post ${i}`}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <CardContent className="p-4">
-                  <h3 className="mb-2 font-semibold">
-                    {
-                      [
-                        "How to Solve Quadratic Equations",
-                        "Chemistry Lab Results",
-                        "My Coding Journey",
-                        "History Quiz Challenge",
-                        "Book Review",
-                        "Science Project",
-                      ][i - 1]
-                    }
-                  </h3>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>{Math.floor(Math.random() * 1000) + 100} views</span>
-                    <span>{Math.floor(Math.random() * 30) + 1} days ago</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+        <TabsContent value="posts">
+          <div className="grid gap-4">
+            {/* Posts content */}
           </div>
         </TabsContent>
 
         <TabsContent value="saved">
-          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
-            <Bookmark className="mb-2 h-10 w-10 text-muted-foreground" />
-            <h3 className="mb-1 text-lg font-medium">No saved content yet</h3>
-            <p className="mb-4 text-muted-foreground">Items you save will appear here</p>
-            <Button>Browse Content</Button>
+          <div className="grid gap-4">
+            {/* Saved content */}
           </div>
         </TabsContent>
 
@@ -264,8 +225,8 @@ export default function ProfilePage() {
                   <Label htmlFor="name">Display Name</Label>
                   <Input
                     id="name"
-                    value={profileData.name}
-                    onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                    value={profile.name}
+                    onChange={(e) => updateProfile({ name: e.target.value })}
                     disabled={!isEditing}
                   />
                 </div>
@@ -273,8 +234,8 @@ export default function ProfilePage() {
                   <Label htmlFor="bio">Bio</Label>
                   <Textarea
                     id="bio"
-                    value={profileData.bio}
-                    onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+                    value={profile.bio}
+                    onChange={(e) => updateProfile({ bio: e.target.value })}
                     disabled={!isEditing}
                     rows={3}
                   />
@@ -283,8 +244,8 @@ export default function ProfilePage() {
                   <Label>Profile Picture</Label>
                   <div className="mt-1 flex items-center gap-4">
                     <Avatar className="h-16 w-16">
-                      <AvatarImage src={profileData.avatar} />
-                      <AvatarFallback>AJ</AvatarFallback>
+                      <AvatarImage src={profile.avatar} />
+                      <AvatarFallback>{profile.name.charAt(0)}</AvatarFallback>
                     </Avatar>
                     {isEditing && (
                       <div>
@@ -308,7 +269,7 @@ export default function ProfilePage() {
                 <div>
                   <Label>Interests</Label>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {profileData.interests.map((interest) => (
+                    {profile.interests.map((interest) => (
                       <Badge key={interest} variant="outline" className="bg-primary/10">
                         {interest}
                         {isEditing && (
