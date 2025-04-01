@@ -5,9 +5,11 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Heart, MessageCircle, Share2, Bookmark, ChevronUp, ChevronDown, Play, Pause } from "lucide-react"
-import { getFeedPosts, likePost, unlikePost } from "@/lib/supabase"
+import { Heart, MessageCircle, Share2, Bookmark, ChevronUp, ChevronDown, Play, Pause, Loader2 } from "lucide-react"
+import { getFeedPosts, likePost, unlikePost, followUser, unfollowUser } from "@/lib/supabase"
 import { useAuth } from "@/lib/auth"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/components/ui/use-toast"
 
 // Define the post type
 interface Post {
@@ -44,8 +46,13 @@ export default function HomeFeed() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({})
+  const [savedPosts, setSavedPosts] = useState<Record<string, boolean>>({})
+  const [followedUsers, setFollowedUsers] = useState<Record<string, boolean>>({})
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({})
   const feedRef = useRef<HTMLDivElement>(null)
   const { user } = useAuth()
+  const router = useRouter()
+  const { toast } = useToast()
 
   // Fetch posts from Supabase
   useEffect(() => {
@@ -78,9 +85,18 @@ export default function HomeFeed() {
   }
 
   const handleLike = async (postId: string) => {
-    if (!user) return // Require authentication
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "You need to sign in to like posts",
+        variant: "destructive"
+      })
+      return
+    }
     
     try {
+      setActionLoading({...actionLoading, [`like-${postId}`]: true})
+      
       if (likedPosts[postId]) {
         await unlikePost(user.id, postId)
         // Update the UI optimistically
@@ -102,7 +118,88 @@ export default function HomeFeed() {
       }
     } catch (err) {
       console.error("Error liking/unliking post:", err)
+      toast({
+        title: "Action failed",
+        description: "Could not like the post. Please try again later.",
+        variant: "destructive"
+      })
+    } finally {
+      setActionLoading({...actionLoading, [`like-${postId}`]: false})
     }
+  }
+
+  const handleFollow = async (userId: string) => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "You need to sign in to follow users",
+        variant: "destructive"
+      })
+      return
+    }
+    
+    try {
+      setActionLoading({...actionLoading, [`follow-${userId}`]: true})
+      
+      if (followedUsers[userId]) {
+        await unfollowUser(user.id, userId)
+        setFollowedUsers({...followedUsers, [userId]: false})
+      } else {
+        await followUser(user.id, userId)
+        setFollowedUsers({...followedUsers, [userId]: true})
+        toast({
+          title: "Success",
+          description: "You are now following this user",
+        })
+      }
+    } catch (err) {
+      console.error("Error following/unfollowing user:", err)
+      toast({
+        title: "Action failed",
+        description: "Could not follow the user. Please try again later.",
+        variant: "destructive"
+      })
+    } finally {
+      setActionLoading({...actionLoading, [`follow-${userId}`]: false})
+    }
+  }
+
+  const handleSave = async (postId: string) => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "You need to sign in to save posts",
+        variant: "destructive"
+      })
+      return
+    }
+    
+    // Toggle saved state for UI
+    setSavedPosts({...savedPosts, [postId]: !savedPosts[postId]})
+    
+    toast({
+      title: savedPosts[postId] ? "Post removed" : "Post saved",
+      description: savedPosts[postId] 
+        ? "Post removed from your saved items" 
+        : "Post saved to your profile",
+    })
+    
+    // Here you would typically call an API to save the post to the user's profile
+    // For now it's just UI state
+  }
+
+  const handleComment = (postId: string) => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "You need to sign in to comment on posts",
+        variant: "destructive"
+      })
+      return
+    }
+    
+    // Navigate to the post page with comments section
+    router.push(`/post/${postId}`)
   }
 
   useEffect(() => {
@@ -147,8 +244,16 @@ export default function HomeFeed() {
                       <div className="text-xs text-muted-foreground">{item.users.username}</div>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm">
-                    Follow
+                  <Button 
+                    variant={followedUsers[item.users.id] ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => handleFollow(item.users.id)}
+                    disabled={actionLoading[`follow-${item.users.id}`]}
+                  >
+                    {actionLoading[`follow-${item.users.id}`] ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                    ) : null}
+                    {followedUsers[item.users.id] ? "Following" : "Follow"}
                   </Button>
                 </div>
               </CardHeader>
@@ -200,11 +305,17 @@ export default function HomeFeed() {
                     size="sm" 
                     className={`flex items-center gap-1 ${likedPosts[item.id] ? 'text-red-500' : ''}`}
                     onClick={() => handleLike(item.id)}
+                    disabled={actionLoading[`like-${item.id}`]}
                   >
                     <Heart className={`h-5 w-5 ${likedPosts[item.id] ? 'fill-current text-red-500' : ''}`} />
                     <span>{item.post_stats.likes_count}</span>
                   </Button>
-                  <Button variant="ghost" size="sm" className="flex items-center gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="flex items-center gap-1"
+                    onClick={() => handleComment(item.id)}
+                  >
                     <MessageCircle className="h-5 w-5" />
                     <span>{item.post_stats.comments_count}</span>
                   </Button>
@@ -213,8 +324,12 @@ export default function HomeFeed() {
                     <span>{item.post_stats.shares_count}</span>
                   </Button>
                 </div>
-                <Button variant="ghost" size="icon">
-                  <Bookmark className="h-5 w-5" />
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => handleSave(item.id)}
+                >
+                  <Bookmark className={`h-5 w-5 ${savedPosts[item.id] ? 'fill-current' : ''}`} />
                 </Button>
               </CardFooter>
             </Card>

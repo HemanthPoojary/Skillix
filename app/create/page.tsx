@@ -17,9 +17,13 @@ import {
   generateImage,
   generateVideoScript 
 } from "@/lib/openai"
+import { createPost } from "@/lib/supabase"
+import { useAuth } from "@/lib/auth"
+import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 
 export default function CreatePage() {
+  const [title, setTitle] = useState("")
   const [tags, setTags] = useState<string[]>(["education"])
   const [newTag, setNewTag] = useState("")
   const [aiPrompt, setAiPrompt] = useState("")
@@ -30,7 +34,10 @@ export default function CreatePage() {
   const [generatedQuiz, setGeneratedQuiz] = useState<any>(null)
   const [targetAudience, setTargetAudience] = useState("high school students")
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
   const { toast } = useToast()
+  const { user } = useAuth()
+  const router = useRouter()
 
   const handleAddTag = () => {
     if (newTag && !tags.includes(newTag)) {
@@ -59,11 +66,46 @@ export default function CreatePage() {
             `Write an educational post about ${aiPrompt} for ${targetAudience}. Make it informative and engaging.`
           )
           setAiResult(generatedText)
+          
+          // Automatically generate an image for the post
+          try {
+            toast({
+              title: "Generating image",
+              description: "Creating a visual for your post. This may take a moment.",
+            })
+            
+            const imagePrompt = await generateImagePrompt(
+              `Educational illustration about ${aiPrompt} for ${targetAudience}, visual representation of the concept`
+            )
+            
+            const imageUrl = await generateImage(imagePrompt)
+            setGeneratedImage(imageUrl)
+          } catch (err) {
+            console.error("Error auto-generating image:", err)
+            // Don't block the content creation if image fails
+          }
           break
 
         case "video":
           const script = await generateVideoScript(aiPrompt, "5 minutes", targetAudience)
           setAiResult(script)
+          
+          // Also generate a thumbnail image for the video
+          try {
+            toast({
+              title: "Generating thumbnail",
+              description: "Creating a thumbnail for your video. This may take a moment.",
+            })
+            
+            const thumbnailPrompt = await generateImagePrompt(
+              `Thumbnail image for educational video about ${aiPrompt}`
+            )
+            
+            const thumbnailUrl = await generateImage(thumbnailPrompt)
+            setGeneratedImage(thumbnailUrl)
+          } catch (err) {
+            console.error("Error generating thumbnail:", err)
+          }
           break
 
         case "image":
@@ -131,6 +173,70 @@ export default function CreatePage() {
     setContentType(value)
   }
 
+  // Handle publish content
+  const handlePublish = async () => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "You need to sign in to publish content.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!title) {
+      toast({
+        title: "Title required",
+        description: "Please add a title to your content",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!aiResult && contentType !== "image") {
+      toast({
+        title: "Content required",
+        description: "Please add some content to publish",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsPublishing(true)
+
+    try {
+      const postData = {
+        type: contentType,
+        title: title,
+        description: aiResult,
+        media_url: generatedImage || "",
+        status: "published"
+      }
+
+      // Create the post
+      const result = await createPost(user.id, postData)
+      
+      // Handle tag associations if implemented in your database
+      
+      toast({
+        title: "Content published!",
+        description: "Your content has been published successfully",
+      })
+      
+      // Redirect to the home feed or post page
+      router.push("/")
+    } catch (error) {
+      console.error("Error publishing content:", error)
+      toast({
+        title: "Publishing failed",
+        description: "Could not publish your content. Please try again later.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="mb-6">
@@ -166,7 +272,7 @@ export default function CreatePage() {
                   <div className="space-y-4">
                     <div>
                       <Label htmlFor="title">Title</Label>
-                      <Input id="title" placeholder="Enter a descriptive title" className="mt-1" />
+                      <Input id="title" placeholder="Enter a descriptive title" className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} />
                     </div>
 
                     <div>
@@ -426,7 +532,16 @@ export default function CreatePage() {
 
           <div className="mt-6 flex justify-end gap-2">
             <Button variant="outline">Save Draft</Button>
-            <Button>Publish</Button>
+            <Button onClick={handlePublish} disabled={isPublishing}>
+              {isPublishing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Publishing...
+                </>
+              ) : (
+                "Publish"
+              )}
+            </Button>
           </div>
         </div>
 
