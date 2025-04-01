@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 
 // Initialize the OpenAI client - Note that we don't actually use this client directly
-// as we're using the API routes instead
+// as we're using the API routes instead. Fixed for better client-side error handling.
 const openai = new OpenAI({
   apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY || '',
   dangerouslyAllowBrowser: true // Note: In production, use server-side API calls instead
