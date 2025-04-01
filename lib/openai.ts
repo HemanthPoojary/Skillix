@@ -11,6 +11,11 @@ const openai = new OpenAI({
 
 // Function to generate text content
 export async function generateTextContent(prompt: string): Promise<string> {
+  if (!prompt) {
+    console.error("No prompt provided for text generation");
+    return "Please provide a topic to generate content.";
+  }
+
   try {
     const response = await fetch('/api/openai', {
       method: 'POST',
@@ -28,11 +33,12 @@ export async function generateTextContent(prompt: string): Promise<string> {
       throw new Error(errorData.error || `Failed to generate content: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({ result: null }));
     return data.result || "Sorry, I couldn't generate content for that prompt.";
   } catch (error) {
     console.error("Error generating text content:", error);
-    throw new Error("Failed to generate content. Please try again later.");
+    // Return a fallback instead of throwing to prevent client-side crash
+    return "Content generation failed. Please try again later.";
   }
 }
 
@@ -42,6 +48,19 @@ export async function generateQuizQuestions(
   difficulty: string = "medium", 
   numberOfQuestions: number = 5
 ): Promise<any> {
+  if (!topic) {
+    console.error("No topic provided for quiz generation");
+    return {
+      questions: [
+        { 
+          questionText: "Sample Question", 
+          options: ["Option 1", "Option 2", "Option 3", "Option 4"], 
+          correctAnswerIndex: 0 
+        }
+      ]
+    };
+  }
+
   try {
     const response = await fetch('/api/openai', {
       method: 'POST',
@@ -63,16 +82,33 @@ export async function generateQuizQuestions(
       throw new Error(errorData.error || `Failed to generate quiz questions: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({ result: null }));
+    if (!data.result) {
+      throw new Error("No quiz data returned from API");
+    }
     return data.result;
   } catch (error) {
     console.error("Error generating quiz questions:", error);
-    throw new Error("Failed to generate quiz questions. Please try again later.");
+    // Return a fallback quiz structure instead of throwing
+    return {
+      questions: [
+        { 
+          questionText: `Sample question about ${topic}`, 
+          options: ["Option 1", "Option 2", "Option 3", "Option 4"], 
+          correctAnswerIndex: 0 
+        }
+      ]
+    };
   }
 }
 
 // Function to generate image prompts for DALL-E
 export async function generateImagePrompt(description: string): Promise<string> {
+  if (!description) {
+    console.error("No description provided for image prompt");
+    return "An educational illustration with colorful elements";
+  }
+
   try {
     const response = await fetch('/api/openai', {
       method: 'POST',
@@ -90,16 +126,22 @@ export async function generateImagePrompt(description: string): Promise<string> 
       throw new Error(errorData.error || `Failed to generate image prompt: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data.result || "";
+    const data = await response.json().catch(() => ({ result: null }));
+    return data.result || "An educational illustration related to the topic";
   } catch (error) {
     console.error("Error generating image prompt:", error);
-    throw new Error("Failed to generate image prompt. Please try again later.");
+    // Return a fallback prompt instead of throwing
+    return "An educational illustration with vibrant colors and engaging design";
   }
 }
 
 // Function to generate an actual image using DALL-E
 export async function generateImage(prompt: string): Promise<string> {
+  if (!prompt) {
+    console.error("No prompt provided for image generation");
+    return ""; // Return empty string to indicate failure
+  }
+
   try {
     const response = await fetch('/api/openai', {
       method: 'POST',
@@ -110,6 +152,8 @@ export async function generateImage(prompt: string): Promise<string> {
         type: 'image',
         prompt: prompt,
       }),
+      // Add a reasonable timeout for image generation
+      signal: AbortSignal.timeout(30000), // 30 seconds timeout
     });
 
     if (!response.ok) {
@@ -117,11 +161,12 @@ export async function generateImage(prompt: string): Promise<string> {
       throw new Error(errorData.error || `Failed to generate image: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({ result: null }));
     return data.result || "";
   } catch (error) {
     console.error("Error generating image:", error);
-    throw new Error("Failed to generate image. Please try again later.");
+    // Return empty string to indicate failure
+    return "";
   }
 }
 
@@ -131,6 +176,11 @@ export async function generateVideoScript(
   duration: string = "5 minutes", 
   audience: string = "students"
 ): Promise<string> {
+  if (!topic) {
+    console.error("No topic provided for video script");
+    return "Please provide a topic to generate a video script.";
+  }
+
   try {
     const response = await fetch('/api/openai', {
       method: 'POST',
@@ -152,10 +202,11 @@ export async function generateVideoScript(
       throw new Error(errorData.error || `Failed to generate video script: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data.result || "";
+    const data = await response.json().catch(() => ({ result: null }));
+    return data.result || "Could not generate a video script. Please try again with a different topic.";
   } catch (error) {
     console.error("Error generating video script:", error);
-    throw new Error("Failed to generate video script. Please try again later.");
+    // Return a fallback message instead of throwing
+    return "Video script generation failed. Please try again later.";
   }
 } 
