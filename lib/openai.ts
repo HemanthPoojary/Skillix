@@ -1,8 +1,9 @@
 import OpenAI from 'openai';
 
-// Initialize the OpenAI client
+// Initialize the OpenAI client - Note that we don't actually use this client directly
+// as we're using the API routes instead
 const openai = new OpenAI({
-  apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
+  apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY || '',
   dangerouslyAllowBrowser: true // Note: In production, use server-side API calls instead
 });
 
@@ -23,8 +24,8 @@ export async function generateTextContent(prompt: string): Promise<string> {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to generate content');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to generate content: ${response.status}`);
     }
 
     const data = await response.json();
@@ -58,8 +59,8 @@ export async function generateQuizQuestions(
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to generate quiz questions');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to generate quiz questions: ${response.status}`);
     }
 
     const data = await response.json();
@@ -85,8 +86,8 @@ export async function generateImagePrompt(description: string): Promise<string> 
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to generate image prompt');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to generate image prompt: ${response.status}`);
     }
 
     const data = await response.json();
@@ -112,8 +113,8 @@ export async function generateImage(prompt: string): Promise<string> {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to generate image');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to generate image: ${response.status}`);
     }
 
     const data = await response.json();
@@ -147,8 +148,8 @@ export async function generateVideoScript(
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to generate video script');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to generate video script: ${response.status}`);
     }
 
     const data = await response.json();
