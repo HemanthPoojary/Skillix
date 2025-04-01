@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 4. Add user interests if provided
     if (userData.interests && userData.interests.length > 0) {
       const interestData = userData.interests.map((interestId: string) => ({
-        user_id: authData.user.id,
+        user_id: authData.user!.id,
         interest_id: interestId
       }));
 
