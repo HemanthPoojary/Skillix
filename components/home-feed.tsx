@@ -6,96 +6,64 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Heart, MessageCircle, Share2, Bookmark, ChevronUp, ChevronDown, Play, Pause } from "lucide-react"
+import { getFeedPosts, likePost, unlikePost } from "@/lib/supabase"
+import { useAuth } from "@/lib/auth"
 
-const feedItems = [
-  {
-    id: 1,
-    user: {
-      name: "Alex Johnson",
-      username: "alexj",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    content: {
-      type: "video",
-      title: "How to Solve Complex Math Problems Easily",
-      description: "Learn these simple tricks to tackle difficult math problems in seconds!",
-      media: "/placeholder.svg?height=600&width=400",
-      duration: "2:45",
-    },
-    stats: {
-      likes: 1243,
-      comments: 89,
-      shares: 56,
-    },
-    tags: ["math", "education", "tricks"],
-  },
-  {
-    id: 2,
-    user: {
-      name: "Sophia Chen",
-      username: "sophiac",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    content: {
-      type: "image",
-      title: "5 Chemistry Experiments You Can Do at Home",
-      description: "Safe and fun chemistry experiments using household items!",
-      media: "/placeholder.svg?height=600&width=400",
-    },
-    stats: {
-      likes: 876,
-      comments: 124,
-      shares: 45,
-    },
-    tags: ["chemistry", "experiments", "science"],
-  },
-  {
-    id: 3,
-    user: {
-      name: "Marcus Williams",
-      username: "marcusw",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    content: {
-      type: "quiz",
-      title: "Test Your History Knowledge",
-      description: "Think you know world history? Try this quick quiz!",
-      media: "/placeholder.svg?height=600&width=400",
-    },
-    stats: {
-      likes: 543,
-      comments: 67,
-      shares: 23,
-    },
-    tags: ["history", "quiz", "knowledge"],
-  },
-  {
-    id: 4,
-    user: {
-      name: "Priya Patel",
-      username: "priyap",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    content: {
-      type: "video",
-      title: "Learn to Code in 10 Minutes a Day",
-      description: "Start your coding journey with these simple daily exercises!",
-      media: "/placeholder.svg?height=600&width=400",
-      duration: "3:12",
-    },
-    stats: {
-      likes: 2156,
-      comments: 203,
-      shares: 178,
-    },
-    tags: ["coding", "programming", "beginners"],
-  },
-]
+// Define the post type
+interface Post {
+  id: string
+  type: string
+  title: string
+  description: string
+  media_url: string
+  duration?: string
+  created_at: string
+  users: {
+    id: string
+    name: string
+    username: string
+    avatar_url: string
+  }
+  post_stats: {
+    likes_count: number
+    comments_count: number
+    shares_count: number
+  }
+  post_tags: {
+    tags: {
+      id: string
+      name: string
+    }
+  }[]
+}
 
 export default function HomeFeed() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [feedItems, setFeedItems] = useState<Post[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({})
   const feedRef = useRef<HTMLDivElement>(null)
+  const { user } = useAuth()
+
+  // Fetch posts from Supabase
+  useEffect(() => {
+    const loadPosts = async () => {
+      try {
+        setIsLoading(true)
+        const posts = await getFeedPosts(10, 0)
+        setFeedItems(posts || [])
+      } catch (err) {
+        console.error("Error fetching posts:", err)
+        setError("Failed to load posts. Please try again later.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadPosts()
+  }, [])
 
   const handleNext = () => {
     if (currentIndex < feedItems.length - 1) {
@@ -106,6 +74,34 @@ export default function HomeFeed() {
   const handlePrev = () => {
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1)
+    }
+  }
+
+  const handleLike = async (postId: string) => {
+    if (!user) return // Require authentication
+    
+    try {
+      if (likedPosts[postId]) {
+        await unlikePost(user.id, postId)
+        // Update the UI optimistically
+        setLikedPosts({...likedPosts, [postId]: false})
+        setFeedItems(feedItems.map(item => 
+          item.id === postId 
+            ? {...item, post_stats: {...item.post_stats, likes_count: item.post_stats.likes_count - 1}} 
+            : item
+        ))
+      } else {
+        await likePost(user.id, postId)
+        // Update the UI optimistically
+        setLikedPosts({...likedPosts, [postId]: true})
+        setFeedItems(feedItems.map(item => 
+          item.id === postId 
+            ? {...item, post_stats: {...item.post_stats, likes_count: item.post_stats.likes_count + 1}} 
+            : item
+        ))
+      }
+    } catch (err) {
+      console.error("Error liking/unliking post:", err)
     }
   }
 
@@ -121,6 +117,18 @@ export default function HomeFeed() {
     }
   }, [currentIndex])
 
+  if (isLoading) {
+    return <div className="flex h-[calc(100vh-12rem)] items-center justify-center">Loading posts...</div>
+  }
+
+  if (error) {
+    return <div className="flex h-[calc(100vh-12rem)] items-center justify-center text-red-500">{error}</div>
+  }
+
+  if (feedItems.length === 0) {
+    return <div className="flex h-[calc(100vh-12rem)] items-center justify-center">No posts found</div>
+  }
+
   return (
     <div className="relative">
       <div ref={feedRef} className="feed-scroll relative h-[calc(100vh-12rem)] overflow-y-auto snap-y snap-mandatory">
@@ -131,12 +139,12 @@ export default function HomeFeed() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Avatar>
-                      <AvatarImage src={item.user.avatar} />
-                      <AvatarFallback>{item.user.name.charAt(0)}</AvatarFallback>
+                      <AvatarImage src={item.users.avatar_url || "/placeholder.svg?height=40&width=40"} />
+                      <AvatarFallback>{item.users.name.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div>
-                      <div className="font-medium">{item.user.name}</div>
-                      <div className="text-xs text-muted-foreground">@{item.user.username}</div>
+                      <div className="font-medium">{item.users.name}</div>
+                      <div className="text-xs text-muted-foreground">{item.users.username}</div>
                     </div>
                   </div>
                   <Button variant="ghost" size="sm">
@@ -148,11 +156,11 @@ export default function HomeFeed() {
               <CardContent className="p-0">
                 <div className="relative aspect-video w-full bg-muted">
                   <img
-                    src={item.content.media || "/placeholder.svg"}
-                    alt={item.content.title}
+                    src={item.media_url || "/placeholder.svg?height=600&width=400"}
+                    alt={item.title}
                     className="h-full w-full object-cover"
                   />
-                  {item.content.type === "video" && (
+                  {item.type === "video" && (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Button
                         variant="secondary"
@@ -162,9 +170,9 @@ export default function HomeFeed() {
                       >
                         {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
                       </Button>
-                      {item.content.duration && (
+                      {item.duration && (
                         <div className="absolute bottom-2 right-2 rounded bg-black/70 px-2 py-1 text-xs text-white">
-                          {item.content.duration}
+                          {item.duration}
                         </div>
                       )}
                     </div>
@@ -172,13 +180,13 @@ export default function HomeFeed() {
                 </div>
 
                 <div className="p-4">
-                  <h3 className="mb-2 text-xl font-semibold">{item.content.title}</h3>
-                  <p className="text-muted-foreground">{item.content.description}</p>
+                  <h3 className="mb-2 text-xl font-semibold">{item.title}</h3>
+                  <p className="text-muted-foreground">{item.description}</p>
 
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {item.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary">
-                        #{tag}
+                    {item.post_tags?.map((tagItem) => (
+                      <Badge key={tagItem.tags.id} variant="secondary">
+                        #{tagItem.tags.name}
                       </Badge>
                     ))}
                   </div>
@@ -187,17 +195,22 @@ export default function HomeFeed() {
 
               <CardFooter className="flex items-center justify-between border-t p-4">
                 <div className="flex items-center gap-4">
-                  <Button variant="ghost" size="sm" className="flex items-center gap-1">
-                    <Heart className="h-5 w-5" />
-                    <span>{item.stats.likes}</span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className={`flex items-center gap-1 ${likedPosts[item.id] ? 'text-red-500' : ''}`}
+                    onClick={() => handleLike(item.id)}
+                  >
+                    <Heart className={`h-5 w-5 ${likedPosts[item.id] ? 'fill-current text-red-500' : ''}`} />
+                    <span>{item.post_stats.likes_count}</span>
                   </Button>
                   <Button variant="ghost" size="sm" className="flex items-center gap-1">
                     <MessageCircle className="h-5 w-5" />
-                    <span>{item.stats.comments}</span>
+                    <span>{item.post_stats.comments_count}</span>
                   </Button>
                   <Button variant="ghost" size="sm" className="flex items-center gap-1">
                     <Share2 className="h-5 w-5" />
-                    <span>{item.stats.shares}</span>
+                    <span>{item.post_stats.shares_count}</span>
                   </Button>
                 </div>
                 <Button variant="ghost" size="icon">
