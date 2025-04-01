@@ -81,47 +81,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: new Error('User creation failed'), data: null };
     }
 
-    // 2. Create user profile
-    const { error: profileError } = await supabase
-      .from('users')
-      .insert({
-        id: authData.user.id,
-        email: email,
-        username: userData.username,
-        name: userData.name,
-        avatar_url: userData.avatar_url || null,
-        bio: userData.bio || null,
-      });
+    try {
+      // 2. Create user profile
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert({
+          id: authData.user.id,
+          email: email,
+          username: userData.username,
+          name: userData.name,
+          avatar_url: userData.avatar_url || null,
+          bio: userData.bio || null,
+        });
 
-    if (profileError) {
-      return { error: profileError, data: null };
-    }
-
-    // 3. Create initial user stats
-    const { error: statsError } = await supabase
-      .from('user_stats')
-      .insert({
-        user_id: authData.user.id
-      });
-
-    if (statsError) {
-      return { error: statsError, data: null };
-    }
-
-    // 4. Add user interests if provided
-    if (userData.interests && userData.interests.length > 0) {
-      const interestData = userData.interests.map((interestId: string) => ({
-        user_id: authData.user!.id,
-        interest_id: interestId
-      }));
-
-      const { error: interestsError } = await supabase
-        .from('user_interests')
-        .insert(interestData);
-
-      if (interestsError) {
-        return { error: interestsError, data: null };
+      if (profileError) {
+        return { error: profileError, data: null };
       }
+
+      // 3. Create initial user stats
+      const { error: statsError } = await supabase
+        .from('user_stats')
+        .insert({
+          user_id: authData.user.id
+        });
+
+      if (statsError) {
+        return { error: statsError, data: null };
+      }
+
+      // 4. Add user interests if provided
+      if (userData.interests && userData.interests.length > 0 && authData.user) {
+        const userId = authData.user.id;
+        const interestData = userData.interests.map((interestId: string) => ({
+          user_id: userId,
+          interest_id: interestId
+        }));
+
+        const { error: interestsError } = await supabase
+          .from('user_interests')
+          .insert(interestData);
+
+        if (interestsError) {
+          return { error: interestsError, data: null };
+        }
+      }
+    } catch (error) {
+      console.error("Error in user signup process:", error);
+      return { error: new Error('Account creation process failed'), data: null };
     }
 
     return { error: null, data: authData };

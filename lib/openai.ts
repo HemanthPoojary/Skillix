@@ -1,11 +1,36 @@
 import OpenAI from 'openai';
 
-// Initialize the OpenAI client - Note that we don't actually use this client directly
-// as we're using the API routes instead. Fixed for better client-side error handling.
-const openai = new OpenAI({
-  apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY || '',
-  dangerouslyAllowBrowser: true // Note: In production, use server-side API calls instead
-});
+// Safe API key access - with fallbacks for when env vars aren't available
+const getApiKey = () => {
+  const key = process.env.NEXT_PUBLIC_OPENAI_API_KEY || '';
+  
+  // Log a debug message if key is missing, but don't throw an error
+  if (!key || key.length < 10) {
+    console.warn('NEXT_PUBLIC_OPENAI_API_KEY is missing or appears invalid. API calls will be simulated.');
+    return null;
+  }
+  return key;
+};
+
+// Safely initialize OpenAI client - only if we have a key
+let openai: OpenAI | null = null;
+try {
+  const apiKey = getApiKey();
+  if (apiKey) {
+    openai = new OpenAI({
+      apiKey,
+      dangerouslyAllowBrowser: true // Note: In production, use server-side API calls instead
+    });
+  }
+} catch (error) {
+  console.error("Error initializing OpenAI client:", error);
+  // Don't throw, just log the error
+}
+
+// Function to check if the client is available before making any calls
+const isClientAvailable = () => {
+  return !!openai;
+};
 
 // Client-side helper functions for OpenAI content generation
 
@@ -17,6 +42,10 @@ export async function generateTextContent(prompt: string): Promise<string> {
   }
 
   try {
+    // Use a safe fetch with a timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
     const response = await fetch('/api/openai', {
       method: 'POST',
       headers: {
@@ -26,14 +55,39 @@ export async function generateTextContent(prompt: string): Promise<string> {
         type: 'text',
         prompt: prompt,
       }),
+      signal: controller.signal
+    }).catch(err => {
+      console.error("Network error during fetch:", err);
+      return null;
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Failed to generate content: ${response.status}`);
+    
+    clearTimeout(timeoutId);
+    
+    if (!response) {
+      return "Content generation failed due to network issues. Please try again.";
     }
 
-    const data = await response.json().catch(() => ({ result: null }));
+    if (!response.ok) {
+      // Try to get error details, but don't fail if that also errors
+      let errorMessage = `Failed to generate content: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error) errorMessage = errorData.error;
+      } catch {}
+      
+      console.error(errorMessage);
+      return "Content generation service is currently unavailable. Please try again later.";
+    }
+
+    // Safe JSON parsing
+    let data;
+    try {
+      data = await response.json();
+    } catch (err) {
+      console.error("Error parsing JSON response:", err);
+      return "Error processing the generated content. Please try again.";
+    }
+    
     return data.result || "Sorry, I couldn't generate content for that prompt.";
   } catch (error) {
     console.error("Error generating text content:", error);
@@ -51,9 +105,11 @@ export async function generateQuizQuestions(
   if (!topic) {
     console.error("No topic provided for quiz generation");
     return {
+      title: "Sample Quiz",
+      description: "Please provide a topic to generate questions.",
       questions: [
         { 
-          questionText: "Sample Question", 
+          question: "Sample Question", 
           options: ["Option 1", "Option 2", "Option 3", "Option 4"], 
           correctAnswerIndex: 0 
         }
@@ -62,6 +118,10 @@ export async function generateQuizQuestions(
   }
 
   try {
+    // Use a safe fetch with a timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
     const response = await fetch('/api/openai', {
       method: 'POST',
       headers: {
@@ -75,25 +135,93 @@ export async function generateQuizQuestions(
           numberOfQuestions
         }
       }),
+      signal: controller.signal
+    }).catch(err => {
+      console.error("Network error during quiz generation fetch:", err);
+      return null;
     });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response) {
+      return {
+        title: `Quiz: ${topic}`,
+        description: "Quiz generation failed due to network issues.",
+        questions: [
+          { 
+            question: `Sample question about ${topic}?`, 
+            options: ["Option 1", "Option 2", "Option 3", "Option 4"], 
+            correctAnswerIndex: 0 
+          }
+        ]
+      };
+    }
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Failed to generate quiz questions: ${response.status}`);
+      // Try to get error details, but don't fail if that also errors
+      let errorMessage = `Failed to generate quiz: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error) errorMessage = errorData.error;
+      } catch {}
+      
+      console.error(errorMessage);
+      return {
+        title: `Quiz: ${topic}`,
+        description: "Quiz generation service is currently unavailable.",
+        questions: [
+          { 
+            question: `Sample question about ${topic}?`, 
+            options: ["Option 1", "Option 2", "Option 3", "Option 4"], 
+            correctAnswerIndex: 0 
+          }
+        ]
+      };
     }
 
-    const data = await response.json().catch(() => ({ result: null }));
-    if (!data.result) {
-      throw new Error("No quiz data returned from API");
+    // Safe JSON parsing
+    let data;
+    try {
+      data = await response.json();
+    } catch (err) {
+      console.error("Error parsing JSON response for quiz:", err);
+      return {
+        title: `Quiz: ${topic}`,
+        description: "Error processing the quiz data.",
+        questions: [
+          { 
+            question: `Sample question about ${topic}?`, 
+            options: ["Option 1", "Option 2", "Option 3", "Option 4"], 
+            correctAnswerIndex: 0 
+          }
+        ]
+      };
     }
+    
+    if (!data.result) {
+      return {
+        title: `Quiz: ${topic}`,
+        description: "No quiz data returned from API.",
+        questions: [
+          { 
+            question: `Sample question about ${topic}?`, 
+            options: ["Option 1", "Option 2", "Option 3", "Option 4"], 
+            correctAnswerIndex: 0 
+          }
+        ]
+      };
+    }
+    
     return data.result;
   } catch (error) {
     console.error("Error generating quiz questions:", error);
     // Return a fallback quiz structure instead of throwing
     return {
+      title: `Quiz: ${topic}`,
+      description: `Test your knowledge about ${topic}`,
       questions: [
         { 
-          questionText: `Sample question about ${topic}`, 
+          question: `Sample question about ${topic}?`, 
           options: ["Option 1", "Option 2", "Option 3", "Option 4"], 
           correctAnswerIndex: 0 
         }
@@ -110,6 +238,10 @@ export async function generateImagePrompt(description: string): Promise<string> 
   }
 
   try {
+    // Use a safe fetch with a timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+    
     const response = await fetch('/api/openai', {
       method: 'POST',
       headers: {
@@ -119,19 +251,37 @@ export async function generateImagePrompt(description: string): Promise<string> 
         type: 'imagePrompt',
         prompt: description,
       }),
+      signal: controller.signal
+    }).catch(err => {
+      console.error("Network error during image prompt fetch:", err);
+      return null;
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Failed to generate image prompt: ${response.status}`);
+    
+    clearTimeout(timeoutId);
+    
+    if (!response) {
+      return `Educational illustration of ${description} with vibrant colors`;
     }
 
-    const data = await response.json().catch(() => ({ result: null }));
-    return data.result || "An educational illustration related to the topic";
+    if (!response.ok) {
+      console.error(`Failed to generate image prompt: ${response.status}`);
+      return `Educational illustration of ${description} with engaging design`;
+    }
+
+    // Safe JSON parsing
+    let data;
+    try {
+      data = await response.json();
+    } catch (err) {
+      console.error("Error parsing JSON response for image prompt:", err);
+      return `Educational illustration of ${description}`;
+    }
+    
+    return data.result || `An educational illustration about ${description}`;
   } catch (error) {
     console.error("Error generating image prompt:", error);
     // Return a fallback prompt instead of throwing
-    return "An educational illustration with vibrant colors and engaging design";
+    return `An educational illustration about ${description} with vibrant colors and engaging design`;
   }
 }
 
@@ -143,6 +293,10 @@ export async function generateImage(prompt: string): Promise<string> {
   }
 
   try {
+    // Use a safe fetch with a timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for image generation
+    
     const response = await fetch('/api/openai', {
       method: 'POST',
       headers: {
@@ -152,16 +306,33 @@ export async function generateImage(prompt: string): Promise<string> {
         type: 'image',
         prompt: prompt,
       }),
-      // Add a reasonable timeout for image generation
-      signal: AbortSignal.timeout(30000), // 30 seconds timeout
+      signal: controller.signal
+    }).catch(err => {
+      console.error("Network error during image generation fetch:", err);
+      return null;
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Failed to generate image: ${response.status}`);
+    
+    clearTimeout(timeoutId);
+    
+    if (!response) {
+      console.error("Network failure during image generation");
+      return ""; // Return empty string to indicate failure
     }
 
-    const data = await response.json().catch(() => ({ result: null }));
+    if (!response.ok) {
+      console.error(`Failed to generate image: ${response.status}`);
+      return ""; // Return empty string to indicate failure
+    }
+
+    // Safe JSON parsing
+    let data;
+    try {
+      data = await response.json();
+    } catch (err) {
+      console.error("Error parsing JSON response for image:", err);
+      return ""; // Return empty string to indicate failure
+    }
+    
     return data.result || "";
   } catch (error) {
     console.error("Error generating image:", error);
@@ -182,6 +353,10 @@ export async function generateVideoScript(
   }
 
   try {
+    // Use a safe fetch with a timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
     const response = await fetch('/api/openai', {
       method: 'POST',
       headers: {
@@ -195,18 +370,36 @@ export async function generateVideoScript(
           audience
         }
       }),
+      signal: controller.signal
+    }).catch(err => {
+      console.error("Network error during video script fetch:", err);
+      return null;
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Failed to generate video script: ${response.status}`);
+    
+    clearTimeout(timeoutId);
+    
+    if (!response) {
+      return `Video Script: ${topic}\n\nUnable to generate a complete script due to network issues. Please try again.`;
     }
 
-    const data = await response.json().catch(() => ({ result: null }));
-    return data.result || "Could not generate a video script. Please try again with a different topic.";
+    if (!response.ok) {
+      console.error(`Failed to generate video script: ${response.status}`);
+      return `Video Script: ${topic}\n\nVideo script generation service is currently unavailable. Please try again later.`;
+    }
+
+    // Safe JSON parsing
+    let data;
+    try {
+      data = await response.json();
+    } catch (err) {
+      console.error("Error parsing JSON response for video script:", err);
+      return `Video Script: ${topic}\n\nError processing the script. Please try again.`;
+    }
+    
+    return data.result || `Video Script: ${topic}\n\nCould not generate a video script. Please try again with a different topic.`;
   } catch (error) {
     console.error("Error generating video script:", error);
     // Return a fallback message instead of throwing
-    return "Video script generation failed. Please try again later.";
+    return `Video Script: ${topic}\n\nVideo script generation failed. Please try again later.`;
   }
 } 

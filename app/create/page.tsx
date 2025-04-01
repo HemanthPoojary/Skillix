@@ -54,10 +54,34 @@ export default function CreatePage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isApiAvailable, setIsApiAvailable] = useState(true)
 
-  // Check for saved draft on component mount
+  // Check for saved draft and API availability on component mount
   useEffect(() => {
     setPageError(null)
+    
+    // Check if OpenAI API is properly configured
+    const checkApiAvailability = async () => {
+      try {
+        // Perform a simple test call to the API with a minimal prompt
+        const testResult = await generateTextContent("test")
+        // If result contains an error indication, set API as unavailable
+        if (testResult.includes("service is currently unavailable") || 
+            testResult.includes("failed") || 
+            testResult.includes("API key is missing")) {
+          setIsApiAvailable(false)
+          console.warn("OpenAI API appears to be unavailable")
+        } else {
+          setIsApiAvailable(true)
+        }
+      } catch (error) {
+        console.error("Error checking API availability:", error)
+        setIsApiAvailable(false)
+      }
+    }
+    
+    checkApiAvailability()
+    
     // Load draft if exists
     const savedDraft = localStorage.getItem('contentDraft')
     if (savedDraft) {
@@ -106,6 +130,16 @@ export default function CreatePage() {
 
   const handleGenerateContent = async () => {
     if (!aiPrompt) return
+    
+    // Check if API is available
+    if (!isApiAvailable) {
+      toast({
+        title: "AI Service Unavailable",
+        description: "The AI service is currently unavailable. Please try again later or create content manually.",
+        variant: "destructive"
+      })
+      return
+    }
 
     setAiGenerating(true)
     setAiResult("")
@@ -613,6 +647,27 @@ export default function CreatePage() {
     }
   }
 
+  // Add a warning component for API unavailability
+  const ApiWarningBanner = () => {
+    if (isApiAvailable) return null
+    
+    return (
+      <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6 rounded">
+        <div className="flex items-center">
+          <div className="py-1">
+            <svg className="h-6 w-6 text-yellow-500 mr-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div>
+            <p className="font-bold">AI Service Limited</p>
+            <p className="text-sm">The AI content generation service is currently unavailable. You can still create content manually.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // If there's a critical error, show a fallback UI
   if (pageError) {
     return (
@@ -641,6 +696,9 @@ export default function CreatePage() {
         <h1 className="text-3xl font-bold">Create Content</h1>
         <p className="text-muted-foreground">Share your knowledge and inspire others</p>
       </div>
+      
+      {/* Display API warning if needed */}
+      <ApiWarningBanner />
 
       <div className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-2">
