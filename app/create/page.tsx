@@ -33,6 +33,7 @@ interface DraftContent {
 }
 
 export default function CreatePage() {
+  const [mounted, setMounted] = useState(false)
   const [title, setTitle] = useState("")
   const [tags, setTags] = useState<string[]>(["education"])
   const [newTag, setNewTag] = useState("")
@@ -56,16 +57,21 @@ export default function CreatePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isApiAvailable, setIsApiAvailable] = useState(true)
 
+  // Handle mounting state
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   // Check for saved draft and API availability on component mount
   useEffect(() => {
+    if (!mounted) return;
+
     setPageError(null)
     
     // Check if OpenAI API is properly configured
     const checkApiAvailability = async () => {
       try {
-        // Perform a simple test call to the API with a minimal prompt
         const testResult = await generateTextContent("test")
-        // If result contains an error indication, set API as unavailable
         if (testResult.includes("service is currently unavailable") || 
             testResult.includes("failed") || 
             testResult.includes("API key is missing")) {
@@ -103,11 +109,15 @@ export default function CreatePage() {
         })
       } catch (error) {
         console.error("Error loading draft:", error)
-        // If there's an error parsing the draft, clear it
         localStorage.removeItem('contentDraft')
       }
     }
-  }, [toast])
+  }, [mounted, toast])
+
+  // If not mounted yet, return null or a loading state
+  if (!mounted) {
+    return null;
+  }
 
   const handleAddTag = () => {
     try {
@@ -468,13 +478,13 @@ export default function CreatePage() {
     if (!user) {
       toast({
         title: "Sign in required",
-        description: "You need to sign in to publish content.",
+        description: "You need to sign in to publish content",
         variant: "destructive"
       })
       return
     }
 
-    if (!title) {
+    if (!title.trim()) {
       toast({
         title: "Title required",
         description: "Please add a title to your content",
@@ -483,67 +493,61 @@ export default function CreatePage() {
       return
     }
 
-    if (contentType !== "image" && !aiResult) {
-      toast({
-        title: "Content required",
-        description: "Please add some content to publish",
-        variant: "destructive"
-      })
-      return
-    }
-
-    if (contentType === "image" && !generatedImage) {
-      toast({
-        title: "Image required",
-        description: "Please generate or upload an image",
-        variant: "destructive"
-      })
-      return
-    }
-
-    setIsPublishing(true)
-
     try {
-      let postData = {
+      setIsPublishing(true)
+      setPageError(null)
+
+      // Prepare post data
+      const postData = {
         type: contentType,
-        title: title,
-        description: aiResult,
+        title: title.trim(),
+        description: contentType === "quiz" && generatedQuiz 
+          ? JSON.stringify(generatedQuiz)
+          : aiResult.trim(),
         media_url: generatedImage || "",
-        status: "published",
         tags: tags
       }
 
-      // Add special handling for quiz type
-      if (contentType === "quiz" && generatedQuiz) {
-        postData.description = JSON.stringify(generatedQuiz)
+      // Create the post
+      const post = await createPost(user.id, postData)
+      
+      if (!post || !post.id) {
+        throw new Error("Failed to create post")
       }
 
-      // Create the post
-      const result = await createPost(user.id, postData)
-      
-      if (result) {
-        // Clear draft after successful publish
-        localStorage.removeItem('contentDraft')
-        setHasDraft(false)
-        
-        toast({
-          title: "Content published!",
-          description: "Your content has been published successfully",
-        })
-        
-        // Redirect to the home feed
-        router.push("/")
-      } else {
-        throw new Error("Failed to publish content")
-      }
+      // Show success message
+      toast({
+        title: "Success!",
+        description: "Your content has been published",
+      })
+
+      // Clear form and draft
+      localStorage.removeItem('contentDraft')
+      setHasDraft(false)
+      setTitle("")
+      setAiResult("")
+      setTags(["education"])
+      setGeneratedImage("")
+      setGeneratedQuiz(null)
+      setAiPrompt("")
+
+      // Navigate to home page and force refresh
+      router.push("/")
+      router.refresh()
+
     } catch (error) {
       console.error("Error publishing content:", error)
+      
+      // Show error message
       toast({
         title: "Publishing failed",
-        description: "Could not publish your content. Please try again later.",
+        description: error instanceof Error 
+          ? error.message 
+          : "Could not publish your content. Please try again.",
         variant: "destructive"
       })
-      setPageError("Failed to publish content. Please check your connection and try again.")
+      
+      setPageError("Failed to publish content. Please try again.")
     } finally {
       setIsPublishing(false)
     }

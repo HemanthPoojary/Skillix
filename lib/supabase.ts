@@ -3,11 +3,18 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
-}
+// Create a client even if env vars are missing, but it won't work
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Helper function to check if Supabase is properly configured
+export const isSupabaseConfigured = () => {
+  return Boolean(supabaseUrl && supabaseAnonKey);
+};
 
 // Helper functions for common database operations
 
@@ -53,21 +60,76 @@ export const updateUserProfile = async (userId: string, updates: any) => {
 
 // Post related operations
 export const getFeedPosts = async (limit = 10, offset = 0) => {
-  const { data, error } = await supabase
-    .from('posts')
-    .select(`
-      *,
-      users (id, name, username, avatar_url),
-      post_stats (*),
-      post_tags (
-        tags (id, name)
-      )
-    `)
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
+  try {
+    if (!isSupabaseConfigured()) {
+      return {
+        data: [],
+        error: 'Supabase is not properly configured. Please check your environment variables.'
+      };
+    }
 
-  if (error) throw error;
-  return data;
+    const { data, error } = await supabase
+      .from('posts')
+      .select(`
+        id,
+        type,
+        title,
+        description,
+        media_url,
+        duration,
+        created_at,
+        user_id,
+        user:user_id (
+          id,
+          name,
+          username,
+          avatar_url
+        ),
+        post_stats!post_id (
+          likes_count,
+          comments_count,
+          shares_count
+        ),
+        post_tags!post_id (
+          tag:tag_id (
+            id,
+            name
+          )
+        )
+      `)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      console.error("Supabase error:", error);
+      return { 
+        data: [], 
+        error: error.message || 'Failed to fetch posts from database' 
+      };
+    }
+
+    if (!data) {
+      return { data: [], error: null };
+    }
+
+    // Transform the data to match the expected format
+    const transformedData = data.map(post => ({
+      ...post,
+      users: post.user,
+      post_stats: post.post_stats?.[0] || { likes_count: 0, comments_count: 0, shares_count: 0 },
+      post_tags: post.post_tags?.map(tag => ({
+        tags: tag.tag
+      })) || []
+    }));
+
+    return { data: transformedData, error: null };
+  } catch (err) {
+    console.error("Error in getFeedPosts:", err);
+    return { 
+      data: [], 
+      error: err instanceof Error ? err.message : 'Failed to fetch posts' 
+    };
+  }
 };
 
 export const getPostById = async (postId: string) => {
@@ -95,16 +157,69 @@ export const getPostById = async (postId: string) => {
 };
 
 export const createPost = async (userId: string, postData: any) => {
-  const { data, error } = await supabase
-    .from('posts')
-    .insert({
-      user_id: userId,
-      ...postData
-    })
-    .select();
+  try {
+    // Step 1: Create the post
+    const { data: post, error: postError } = await supabase
+      .from('posts')
+      .insert([{
+        user_id: userId,
+        type: postData.type || 'post',
+        title: postData.title,
+        description: postData.description,
+        media_url: postData.media_url || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        status: 'published'
+      }])
+      .select(`
+        id,
+        type,
+        title,
+        description,
+        media_url,
+        created_at,
+        updated_at,
+        status,
+        user_id
+      `)
+      .single();
 
-  if (error) throw error;
-  return data;
+    if (postError) {
+      console.error("Error creating post:", postError);
+      throw new Error(postError.message);
+    }
+
+    if (!post) {
+      throw new Error('Failed to create post');
+    }
+
+    // Step 2: Create post stats
+    await supabase
+      .from('post_stats')
+      .insert([{
+        post_id: post.id,
+        likes_count: 0,
+        comments_count: 0,
+        shares_count: 0
+      }]);
+
+    // Step 3: Create post tags if any
+    if (postData.tags && postData.tags.length > 0) {
+      const tagInserts = postData.tags.map((tag: string) => ({
+        post_id: post.id,
+        tag_id: tag
+      }));
+
+      await supabase
+        .from('post_tags')
+        .insert(tagInserts);
+    }
+
+    return post;
+  } catch (err) {
+    console.error("Error in createPost:", err);
+    throw err;
+  }
 };
 
 // Like operations

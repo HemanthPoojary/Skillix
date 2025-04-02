@@ -63,12 +63,24 @@ export default function HomeFeed() {
         setIsLoading(true)
         setError(null)
         
-        const posts = await getFeedPosts(10, 0)
+        const { data: posts, error: postsError } = await getFeedPosts(10, 0)
         
         if (isMounted) {
+          if (postsError) {
+            console.error("Feed loading error:", postsError)
+            setError(postsError)
+            toast({
+              title: "Error loading content",
+              description: postsError.includes("not properly configured")
+                ? "Please check your Supabase configuration in the .env.local file."
+                : "We couldn't load the feed. Please try refreshing.",
+              variant: "destructive"
+            })
+            return
+          }
+
           if (!posts || posts.length === 0) {
-            // Handle the case when no posts are returned
-            setFeedItems([]);
+            setFeedItems([])
           } else {
             // Ensure all posts have the required structure
             const validPosts = posts.filter(post => 
@@ -77,7 +89,7 @@ export default function HomeFeed() {
               ...post,
               // Ensure post_tags is an array even if null/undefined
               post_tags: post.post_tags || []
-            }));
+            }))
             
             setFeedItems(validPosts)
           }
@@ -85,11 +97,13 @@ export default function HomeFeed() {
       } catch (err) {
         console.error("Error fetching posts:", err)
         if (isMounted) {
-          setError("Failed to load posts. Please try again later.")
-          // Show error toast
+          const errorMessage = err instanceof Error 
+            ? err.message 
+            : "Failed to load posts. Please try again later."
+          setError(errorMessage)
           toast({
             title: "Error loading content",
-            description: "We couldn't load the feed. Please try refreshing.",
+            description: errorMessage,
             variant: "destructive"
           })
         }
